@@ -1,0 +1,4 @@
+.env
+venv/
+futebol.db
+__pycache__/
