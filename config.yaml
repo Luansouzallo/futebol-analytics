@@ -1,0 +1,130 @@
+==============================================================================
+
+⚽ Futebol Analytics - Arquivo de Configuração Centralizada (config.yaml)
+
+==============================================================================
+
+version: "1.2.0"
+environment: "production"
+
+------------------------------------------------------------------------------
+
+📱 Configurações da Aplicação Web (Streamlit)
+
+------------------------------------------------------------------------------
+
+app:
+title: "Futebol Analytics & Match Simulator"
+page_icon: "⚽"
+layout: "wide"
+default_language: "pt-BR"
+
+------------------------------------------------------------------------------
+
+🗄️ Banco de Dados Relacional e Fallback
+
+------------------------------------------------------------------------------
+
+database:
+db_path: "futebol.db"
+fallback_to_memory: true
+required_tables:
+- "teams"
+- "players"
+
+------------------------------------------------------------------------------
+
+🌐 Configurações da API Externa (Football-Data.org)
+
+------------------------------------------------------------------------------
+
+api:
+provider: "Football-Data.org"
+base_url: "https://api.football-data.org/v4/"
+timeout_seconds: 10
+rate_limit_delay: 1.2
+target_competitions:
+- code: "PL"
+name: "Premier League"
+- code: "PD"
+name: "La Liga"
+- code: "SA"
+name: "Serie A"
+- code: "BL1"
+name: "Bundesliga"
+
+------------------------------------------------------------------------------
+
+🎲 Parâmetros do Motor Probabilístico (Poisson Engine)
+
+------------------------------------------------------------------------------
+
+simulation_engine:
+poisson:
+home_advantage: 2.5        # Incremento fixo de rating para o mandante
+base_lambda: 1.35          # Taxa base de expectativa de gols por equipe
+sensitivity_factor: 0.04   # Multiplicador do diferencial de rating
+min_lambda: 0.2            # Limite inferior para evitar expectativa nula
+max_goals_matrix: 6        # Dimensão da matriz de distribuição do placar
+random_seed: 42            # Semente determinística para reprodutibilidade/auditoria
+
+------------------------------------------------------------------------------
+
+🧠 Regras do Módulo de Rating & Explicabilidade (XAI)
+
+------------------------------------------------------------------------------
+
+rating_engine:
+league_multipliers:
+"Premier League": 4.0
+"La Liga": 3.5
+"Serie A": 3.0
+"Bundesliga": 3.0
+"Ligue 1": 2.5
+"Default": 2.0
+
+age_adjustments:
+peak_performance:           # Pico Performático (24-29 anos)
+min_age: 24
+max_age: 29
+adjustment: 3.5
+development:               # Em Desenvolvimento (21-23 anos)
+min_age: 21
+max_age: 23
+adjustment: 1.5
+prospect:                  # Jovem Promessa (< 21 anos)
+min_age: 0
+max_age: 20
+adjustment: 0.5
+decline:                   # Leve Declínio Físico (30-34 anos)
+min_age: 30
+max_age: 34
+adjustment: -1.0
+veteran:                   # Final de Carreira (35+ anos)
+min_age: 35
+max_age: 100
+adjustment: -2.5
+
+------------------------------------------------------------------------------
+
+🔄 MLOps, Rastreabilidade e Monitoramento de Data Drift
+
+------------------------------------------------------------------------------
+
+mlops:
+mlflow:
+tracking_uri: "sqlite:///mlflow.db"
+experiment_name: "futebol_analytics_simulations"
+model_stage: "Production"
+
+monitoring:
+drift_detection:
+enabled: true
+alpha_significance: 0.05
+metric: "ks_test"
+monitored_columns:
+- "rating_global"
+
+logging:
+level: "INFO"
+file_path: "logs/futebol_analytics.log"
