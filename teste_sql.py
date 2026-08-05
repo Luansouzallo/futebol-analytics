@@ -25,7 +25,7 @@ else:
 print(f"🔌 Conectado ao futebol.db | Coluna de Liga identificada: {league_col}")
 
 queries = {
-    "1. Top 3 Atletas por Posição em Cada Liga (Window Functions)": f"""
+    "1. Top 5 Atletas por Posição em Cada Liga (Window Functions)": f"""
         WITH RankedPlayers AS (
             SELECT 
                 p.name AS jogador,
@@ -49,7 +49,7 @@ queries = {
             clube,
             rating_global
         FROM RankedPlayers
-        WHERE ranking_posicao <= 3
+        WHERE ranking_posicao <= 5
         ORDER BY liga, posicao, ranking_posicao;
     """,
     "2. Comparativo do Elenco vs Média da Liga": f"""
@@ -126,11 +126,11 @@ queries = {
             GROUP BY team_id
         ) sub ON p.team_id = sub.team_id
         GROUP BY {league_col}, t.name
-        HAVING num_jogadores >= 11
+        HAVING num_jogadores >= 2
         ORDER BY variancia_elenco DESC
         LIMIT 10;
     """,
-    "5. Principais Talentos por Nacionalidade (Top 5 Concatenados)": """
+    "5. Principais Talentos por Nacionalidade (GROUP_CONCAT & Top 5)": """
         WITH RankedTopPlayers AS (
             SELECT 
                 p.nationality AS pais,
@@ -166,15 +166,16 @@ queries = {
     """
 }
 
-for title, query in queries.items():
-    print("\n" + "="*60)
-    print(f"▶️ {title}")
-    print("="*60)
-    try:
-        df = pd.read_sql_query(query, conn)
-        print(df.to_string(index=False))
-        print(f"\n✅ Linhas retornadas: {len(df)}")
-    except Exception as e:
-        print(f"❌ Erro ao executar consulta: {e}")
-
-conn.close()
+if __name__ == "__main__":
+    for title, query in queries.items():
+        print("=" * 70)
+        print(f"📊 {title}")
+        print("=" * 70)
+        try:
+            df = pd.read_sql_query(query, conn)
+            print(df.to_string(index=False))
+            print(f"\n✅ Total de registros retornados: {len(df)}\n")
+        except Exception as e:
+            print(f"❌ Erro ao executar query: {e}\n")
+    
+    conn.close()
