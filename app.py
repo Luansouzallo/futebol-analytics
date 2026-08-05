@@ -1,6 +1,7 @@
 import sqlite3
 import pandas as pd
 import numpy as np
+from datetime import datetime
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
@@ -98,11 +99,44 @@ def get_league_column(conn):
         return "p.league"
     return "'Liga Principal'"
 
+def calculate_xai_components(final_rating: float, date_of_birth_str: str, league_name: str):
+    """
+    Decompõe o rating final em componentes explicáveis (XAI Breakdown):
+    Rating Final = Rating Base + Ajuste Etário + Ajuste Competitivo da Liga
+    """
+    # 1. Ajuste Etário
+    age_factor = 0.0
+    if date_of_birth_str:
+        try:
+            birth_year = int(date_of_birth_str.split("-")[0])
+            current_year = datetime.now().year
+            age = current_year - birth_year
+            if 24 <= age <= 29:
+                age_factor = 3.5  # Bônus de pico performático
+            elif 21 <= age <= 23:
+                age_factor = 1.5  # Em desenvolvimento
+            elif age < 21:
+                age_factor = 0.5  # Jovem promessa
+            elif 30 <= age <= 34:
+                age_factor = -1.0 # Leve declínio físico
+            else:
+                age_factor = -2.5 # Final de carreira
+        except Exception:
+            age_factor = 0.0
+
+    # 2. Peso da Liga
+    league_factor = 4.0 if "Premier League" in str(league_name) else 2.0
+
+    # 3. Rating Base
+    base_rating = final_rating - age_factor - league_factor
+
+    return round(base_rating, 2), round(age_factor, 2), round(league_factor, 2)
+
 conn, is_sample = get_db_connection()
 league_col = get_league_column(conn)
 
 st.title("⚽ Futebol Analytics & Match Simulator")
-st.caption("Plataforma Integrada de Inteligência Esportiva e Análise Relacional SQL")
+st.caption("Plataforma Integrada de Inteligência Esportiva, MLOps e Análise Relacional SQL")
 
 if is_sample:
     st.info("ℹ️ Exibindo modo de demonstração com dados de exemplo. Conecte seu `futebol.db` para carregar o banco completo.")
@@ -110,7 +144,7 @@ if is_sample:
 tab1, tab2, tab3, tab4 = st.tabs([
     "🎮 Simulador de Partidas", 
     "🏆 Ranking Global", 
-    "📋 Elencos dos Times", 
+    "📋 Elencos & Explicabilidade (XAI)", 
     "📊 SQL Analytics Lab"
 ])
 
@@ -228,7 +262,7 @@ with tab2:
     st.dataframe(filtered_df, use_container_width=True, hide_index=True)
 
 with tab3:
-    st.header("📋 Análise Detalhada de Elencos")
+    st.header("📋 Análise Detalhada de Elencos & Explicabilidade (XAI)")
     
     teams_query = pd.read_sql_query("SELECT id, name FROM teams ORDER BY name", conn)
     selected_team_name = st.selectbox("Selecione o Clube para Análise:", teams_query["name"].tolist())
@@ -239,6 +273,7 @@ with tab3:
             p.position AS Posição,
             p.nationality AS Nacionalidade,
             p.date_of_birth AS "Data Nascimento",
+            {league_col} AS Liga,
             p.rating_global AS "Rating Global"
         FROM players p
         JOIN teams t ON p.team_id = t.id
@@ -251,7 +286,47 @@ with tab3:
     col_m2.metric("Rating Médio do Elenco", f"{df_squad['Rating Global'].mean():.2f}" if not df_squad.empty else "N/A")
     col_m3.metric("Maior Rating do Time", f"{df_squad['Rating Global'].max():.1f}" if not df_squad.empty else "N/A")
     
-    st.dataframe(df_squad, use_container_width=True, hide_index=True)
+    st.dataframe(df_squad[["Jogador", "Posição", "Nacionalidade", "Data Nascimento", "Rating Global"]], use_container_width=True, hide_index=True)
+    
+    st.divider()
+    
+    # MÓDULO DE EXPLICABILIDADE (XAI - EXPLAINABLE AI)
+    st.subheader("🧠 Módulo XAI: Explicabilidade do Rating de Atletas")
+    st.markdown("Entenda como a nota global do jogador é composta a partir de seus componentes fundamentais.")
+    
+    if not df_squad.empty:
+        selected_player = st.selectbox("Selecione um jogador para analisar:", df_squad["Jogador"].tolist(), key="xai_player_select")
+        player_row = df_squad[df_squad["Jogador"] == selected_player].iloc[0]
+        
+        final_rating = player_row["Rating Global"]
+        dob = player_row["Data Nascimento"]
+        league = player_row["Liga"]
+        
+        base_r, age_adj, league_adj = calculate_xai_components(final_rating, dob, league)
+        
+        # Plot Waterfall Chart
+        fig_xai = go.Figure(go.Waterfall(
+            name="XAI Rating Breakdown",
+            orientation="v",
+            measure=["relative", "relative", "relative", "total"],
+            x=["Rating Base", "Ajuste Etário", "Peso da Liga", "Rating Final"],
+            textposition="outside",
+            text=[f"{base_r:.1f}", f"{age_adj:+.1f}", f"{league_adj:+.1f}", f"{final_rating:.1f}"],
+            y=[base_r, age_adj, league_adj, 0],
+            connector={"line": {"color": "rgb(63, 63, 63)"}},
+            decreasing={"marker": {"color": "#EF553B"}},
+            increasing={"marker": {"color": "#00CC96"}},
+            totals={"marker": {"color": "#636EFA"}}
+        ))
+        
+        fig_xai.update_layout(
+            title=f"Decomposição de Performance: {selected_player} ({player_row['Posição']})",
+            yaxis_title="Pontos de Rating",
+            showlegend=False,
+            height=450
+        )
+        
+        st.plotly_chart(fig_xai, use_container_width=True)
 
 with tab4:
     st.header("📊 SQL Analytics Lab")
@@ -259,7 +334,6 @@ with tab4:
     Execute consultas SQL avançadas (*Window Functions*, *CTEs*, *CASE WHEN*, *Agregações de Dispersão*) diretamente no banco **`futebol.db`**.
     """)
     
-    # Defining SQL queries dictionary with dynamic column variable
     queries = {
         "1. Top 3 Atletas por Posição em Cada Liga (Window Functions)": f"""
 -- Top 3 jogadores por posição dentro de cada liga usando DENSE_RANK()
